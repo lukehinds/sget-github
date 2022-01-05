@@ -34,25 +34,21 @@ fn main() -> Result<()> {
     )?;
     println!("tree_sha: {:?}", tree_sha);
 
-    // Based on PushCommit, this should update the object sha
-    // currently it will be set the same as the head_sha, based on create tree
-    // need to send reference and tree
-    // This can be empty!
-    // This needs to be returned as a Vector
-    let parent = api_client::get_commit(
+    // Returns a Vec<Content>
+    let parents = api_client::get_parent(
         "lukehinds",
         "acme",
         head_sha.clone()
     )?;
-    println!("parent: {:?}", parent[0].sha);
-    println!("parent: {:?}", parent[1].sha);
+    println!("parent: {:?}", parents[0].sha);
+    println!("parent: {:?}", parents[1].sha);
 
-    // let commit_sha = api_client::create_commit(
-    //     "lukehinds",
-    //     "acme",
-    //     head_sha.clone(),
-    //     tree_sha.clone(),
-    // )?;
-    // println!("commit_sha: {:?}", commit_sha);
+    let commit_sha = api_client::push_commit(
+        "lukehinds",
+        "acme",
+        tree_sha.clone(),
+        parents
+    )?;
+    println!("commit_sha: {:?}", commit_sha);
     Ok(())
 }

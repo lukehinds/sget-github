@@ -43,7 +43,7 @@ struct TreeObject {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-struct GetCommit {
+struct Commit {
     sha: String,
     node_id: String,
     url: String,
@@ -187,7 +187,7 @@ pub fn create_tree(owner: &str, repo: &str, head_sha: String) -> Result<String, 
     Ok(tree_sha)
 }
 
-pub fn get_commit(owner: &str, repo: &str, head_sha: String) -> Result<Vec<Parent>, ReqError> {
+pub fn get_parent(owner: &str, repo: &str, head_sha: String) -> Result<Vec<Parent>, ReqError> {
      let url: String = format!("https://api.github.com/repos/{}/{}/git/commits/{}", owner, repo, head_sha);
      let client = reqwest::blocking::Client::new();
      let response = client
@@ -198,12 +198,12 @@ pub fn get_commit(owner: &str, repo: &str, head_sha: String) -> Result<Vec<Paren
         .timeout(Duration::from_secs(5))
         .send()?;
     println!("get_commit HTTP code: {:?}", response.status());
-    let data: GetCommit = response.json()?;
+    let data: Commit = response.json()?;
     Ok(data.parents)
 }
 
 // create the pull request
-pub fn create_commit(owner: &str, repo: &str, tree_sha: String, head_sha: String) -> Result<String, ReqError> {
+pub fn push_commit(owner: &str, repo: &str,  tree_sha: String, parents: Vec<Parent>) -> Result<(), ReqError> {
     let _date_now = chrono::offset::Local::now();
     let url: String = format!("https://api.github.com/repos/{}/{}/git/commits", owner, repo);
     let body = format!(
@@ -211,11 +211,10 @@ pub fn create_commit(owner: &str, repo: &str, tree_sha: String, head_sha: String
             "message": "Update script",
             "tree": "{}",
             "parents": [
-                "{}"
+                "{:?}"
             ]
         }}"#,
-        tree_sha,
-        head_sha
+        tree_sha, parents
     );
     let client = reqwest::blocking::Client::new();
     let response = client
@@ -227,9 +226,9 @@ pub fn create_commit(owner: &str, repo: &str, tree_sha: String, head_sha: String
         .body(body)
         .send()?;
     println!("create_commit HTTP code: {:?}", response.status());
-    let data: GetCommit = response.json()?;
-    println!("create_commit data: {:?}", data.sha);
-    Ok(data.sha)
+    let data: Commit = response.json()?;
+    println!("create_commit data: {:?}", data);
+    Ok(())
 
 }
 
