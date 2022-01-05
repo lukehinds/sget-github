@@ -1,5 +1,5 @@
 use crate::error::ReqError;
-use chrono::Utc;
+use chrono::offset;
 use std::env;
 use std::time::Duration;
 use serde::{Serialize, Deserialize};
@@ -204,7 +204,7 @@ pub fn get_parent(owner: &str, repo: &str, head_sha: String) -> Result<Vec<Paren
 
 // create the pull request
 pub fn push_commit(owner: &str, repo: &str,  tree_sha: String, parents: Vec<Parent>) -> Result<(), ReqError> {
-    let _date_now = chrono::offset::Local::now();
+    let _date_now = offset::Local::now();
     let url: String = format!("https://api.github.com/repos/{}/{}/git/commits", owner, repo);
     let body = format!(
         r#"{{
@@ -236,7 +236,6 @@ pub fn push_commit(owner: &str, repo: &str,  tree_sha: String, parents: Vec<Pare
 pub fn create_pr() {
 
 }
-
 
 // https://docs.rs/reqwest/latest/reqwest/struct.StatusCode.html
 
