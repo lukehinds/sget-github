@@ -44,8 +44,8 @@ fn main() -> Result<()> {
         "acme",
         head_sha.clone()
     )?;
-    // println!("parent: {:?}", parent);
-    println!("parent sha: {:?}", parent);
+    println!("parent: {:?}", parent[0].sha);
+    println!("parent: {:?}", parent[1].sha);
 
     // let commit_sha = api_client::create_commit(
     //     "lukehinds",

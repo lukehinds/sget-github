@@ -69,8 +69,8 @@ struct Tree {
     url: String,
 }
 #[derive(Serialize, Deserialize, Debug)]
-struct Parent {
-    sha: String,
+pub struct Parent {
+    pub sha: String,
     url: String,
     html_url: String,
 }
@@ -187,7 +187,7 @@ pub fn create_tree(owner: &str, repo: &str, head_sha: String) -> Result<String, 
     Ok(tree_sha)
 }
 
-pub fn get_commit(owner: &str, repo: &str, head_sha: String) -> Result<(), ReqError> {
+pub fn get_commit(owner: &str, repo: &str, head_sha: String) -> Result<Vec<Parent>, ReqError> {
      let url: String = format!("https://api.github.com/repos/{}/{}/git/commits/{}", owner, repo, head_sha);
      let client = reqwest::blocking::Client::new();
      let response = client
@@ -199,8 +199,7 @@ pub fn get_commit(owner: &str, repo: &str, head_sha: String) -> Result<(), ReqEr
         .send()?;
     println!("get_commit HTTP code: {:?}", response.status());
     let data: GetCommit = response.json()?;
-    println!("parents: {:?}", data.parents[0].sha);
-    Ok(())
+    Ok(data.parents)
 }
 
 // create the pull request
