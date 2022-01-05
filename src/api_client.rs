@@ -1,7 +1,10 @@
 use crate::error::ReqError;
+use chrono::Utc;
 use std::env;
 use std::time::Duration;
 use serde::{Serialize, Deserialize};
+
+// import ureq Response struct
 
 #[derive(Serialize, Deserialize, Debug)]
 struct Content {
@@ -20,7 +23,7 @@ struct Object {
     url: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize,)]
 struct TreeEntry {
     sha: String,
     url: String,
@@ -28,15 +31,56 @@ struct TreeEntry {
     truncated: bool,
 }
 
-  #[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 struct TreeObject {
     path: String,
     mode: String,
     #[serde(rename = "type")]
     type_: String,
-    size: u64,
+    size: Option<u64>,
     sha: String,
     url: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct GetCommit {
+    sha: String,
+    node_id: String,
+    url: String,
+    html_url: String,
+    author: Author,
+    committer: Author,
+    message: String,
+    tree: Tree,
+    parents: Vec<Parent>,
+    verification: Verification,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct Author {
+    name: String,
+    email: String,
+    date: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct Tree {
+    sha: String,
+    url: String,
+}
+#[derive(Serialize, Deserialize, Debug)]
+struct Parent {
+    sha: String,
+    url: String,
+    html_url: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct Verification {
+    verified: bool,
+    reason: String,
+    signature: String,
+    payload: String,
 }
 
 fn get_github_token() -> String {
@@ -47,8 +91,8 @@ fn get_github_token() -> String {
 }
 
 // Get the head SHA of the repository (required for get_ref)
-pub fn get_head(owner: &str, repo: &str) -> Result<String, ReqError> {
-    let url = format!("https://api.github.com/repos/{}/{}/git/refs/heads", owner, repo);
+pub fn get_base(owner: &str, repo: &str, base_ref: &str) -> Result<String, ReqError> {
+    let url = format!("https://api.github.com/repos/{}/{}/git/refs/heads/{}", owner, repo, base_ref);
     let client = reqwest::blocking::Client::new();
     let response = client
         .get(url)
@@ -57,14 +101,15 @@ pub fn get_head(owner: &str, repo: &str) -> Result<String, ReqError> {
         .header("User-Agent", "acme-rs")
         .timeout(Duration::from_secs(5))
         .send()?;
-    println!("{:?}", response.status());
-    let data: Vec<Content> = response.json()?;
-    let ref_sha = &data.last().unwrap().object.sha;
-    Ok(ref_sha.to_string())
+    println!("get_base HTTP code: {:?}", response.status());
+    // let data: Vec<Content> = response.json()?;
+    let data: Content = response.json()?;
+    println!("get_base data: {:?}", data.object.sha);
+    Ok(data.object.sha)
 }
 
 // Check if named ref exists, if not (404 not found) create it
-pub fn get_ref(owner: &str, repo: &str, gitref: String, head_sha: String) -> Result<(), ReqError> {
+pub fn get_ref(owner: &str, repo: &str, gitref: String, head_sha: String) -> Result<String, ReqError> {
     let client = reqwest::blocking::Client::new();
     let url = format!("https://api.github.com/repos/{}/{}/git/{}", owner, repo, gitref);
     let response = client
@@ -74,25 +119,16 @@ pub fn get_ref(owner: &str, repo: &str, gitref: String, head_sha: String) -> Res
         .header("User-Agent", "SIGSTORE")
         .timeout(Duration::from_secs(120))
         .send()?;
-    println!("{:?}", response.status());
 
-    // break this out into a function
-    match response.status() {
-        reqwest::StatusCode::OK => (),
-        reqwest::StatusCode::BAD_REQUEST => return Err(ReqError::BadRequest),
-        reqwest::StatusCode::UNAUTHORIZED => return Err(ReqError::AuthError),
-        reqwest::StatusCode::NOT_FOUND => create_ref(owner, repo, gitref, head_sha)?,
-        reqwest::StatusCode::UNSUPPORTED_MEDIA_TYPE => {
-            return Err(ReqError::UnsupportedMediaType)
-        }
-        reqwest::StatusCode::TOO_MANY_REQUESTS => return Err(ReqError::TooManyRequest),
-        _ => return Err(ReqError::UnknownConnectionError),
+    if response.status() == 404 {
+        return create_ref(owner, repo, gitref, head_sha)
+    } else {
+        return Err(ReqError::BadRequest)
     }
-    Ok(())
 }
 
 // Create a ref
-fn create_ref(owner: &str, repo: &str, gitref: String, head_sha: String) -> Result<(), ReqError> {
+fn create_ref(owner: &str, repo: &str, gitref: String, head_sha: String) -> Result<String, ReqError> {
     println!("Creating ref: {}", gitref);
     let url: String = format!("https://api.github.com/repos/{}/{}/git/refs", owner, repo);
     let body = format!(
@@ -111,11 +147,10 @@ fn create_ref(owner: &str, repo: &str, gitref: String, head_sha: String) -> Resu
         .timeout(Duration::from_secs(120))
         .body(body)
         .send()?;
-    println!("Create ref{:?}", response.status());
+    println!("create_ref HTTP code {:?}", response.status());
     let data: Content = response.json()?;
     let ref_name = data.ref_;
-    println!("{:?}", ref_name);
-    Ok(())
+    Ok(ref_name)
 }
 
 // build the files into an array and create a git tree
@@ -152,25 +187,60 @@ pub fn create_tree(owner: &str, repo: &str, head_sha: String) -> Result<String, 
     Ok(tree_sha)
 }
 
-// push the tree to the remote branch
-fn prepare_commit() {
-
-}
-
-// push the commit
-fn create_commit() {
-
-}
-
-// the ref is updated
-fn update_ref() {
-
+pub fn get_commit(owner: &str, repo: &str, head_sha: String) -> Result<(), ReqError> {
+     let url: String = format!("https://api.github.com/repos/{}/{}/git/commits/{}", owner, repo, head_sha);
+     let client = reqwest::blocking::Client::new();
+     let response = client
+        .get(url)
+        .header("Authorization", get_github_token())
+        .header("Accept", "application/vnd.github.v3+json")
+        .header("User-Agent", "acme-rs")
+        .timeout(Duration::from_secs(5))
+        .send()?;
+    println!("get_commit HTTP code: {:?}", response.status());
+    let data: GetCommit = response.json()?;
+    println!("parents: {:?}", data.parents[0].sha);
+    Ok(())
 }
 
 // create the pull request
-fn create_pull_request() {
+pub fn create_commit(owner: &str, repo: &str, tree_sha: String, head_sha: String) -> Result<String, ReqError> {
+    let _date_now = chrono::offset::Local::now();
+    let url: String = format!("https://api.github.com/repos/{}/{}/git/commits", owner, repo);
+    let body = format!(
+        r#"{{
+            "message": "Update script",
+            "tree": "{}",
+            "parents": [
+                "{}"
+            ]
+        }}"#,
+        tree_sha,
+        head_sha
+    );
+    let client = reqwest::blocking::Client::new();
+    let response = client
+        .post(url)
+        .header("Authorization", get_github_token())
+        .header("Accept", "application/vnd.github.v3+json")
+        .header("User-Agent", "SIGSTORE")
+        .timeout(Duration::from_secs(120))
+        .body(body)
+        .send()?;
+    println!("create_commit HTTP code: {:?}", response.status());
+    let data: GetCommit = response.json()?;
+    println!("create_commit data: {:?}", data.sha);
+    Ok(data.sha)
 
 }
+
+// push the pull request
+pub fn create_pr() {
+
+}
+
+
+// https://docs.rs/reqwest/latest/reqwest/struct.StatusCode.html
 
 // match response.status() {
 //         reqwest::StatusCode::OK => (),
@@ -182,6 +252,3 @@ fn create_pull_request() {
 //         reqwest::StatusCode::TOO_MANY_REQUESTS => return Err(ReqError::TooManyRequest),
 //         _ => return Err(ReqError::UnknownConnectionError),
 // }
-
-
-// https://docs.rs/reqwest/latest/reqwest/struct.StatusCode.html
