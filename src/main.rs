@@ -9,7 +9,7 @@ use random_string::generate;
 
 fn main() -> Result<()> {
     let owner = "jyotsna-penumaka";
-    let repo = "acme";
+    let repo = "new";
     let base = "main";
     let maintainer_can_modify = true;
     let draft = false;
@@ -41,12 +41,23 @@ fn main() -> Result<()> {
     )?;
     println!("tree_sha: {:?}", tree_sha);
 
-    let parents = api_client::get_parent(
+    let parent_commit = api_client::get_parent_commit(
         owner,
         repo,
         head_sha.clone()
     )?;
-    // println!("parent: {:?}", parents[1].sha);
+
+    let mut parents = parent_commit.parents;
+
+    if parents.capacity() == 0 {
+        println!("Parent's capacity is 0");
+        let root = api_client::Parent {
+            sha: parent_commit.sha,
+            url: parent_commit.url,
+            html_url: parent_commit.html_url
+        };
+        parents.push(root);
+    }
 
     // Make a commit
     let commit_sha = api_client::push_commit(

@@ -519,16 +519,16 @@ struct TreeObject {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-struct Commit {
-    sha: String,
+pub struct Commit {
+    pub sha: String,
     node_id: String,
-    url: String,
-    html_url: String,
+    pub url: String,
+    pub html_url: String,
     author: Author,
     committer: Author,
     message: String,
     tree: Tree,
-    parents: Vec<Parent>,
+    pub parents: Vec<Parent>,
     verification: Verification,
 }
 
@@ -547,8 +547,8 @@ struct Tree {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Parent {
     pub sha: String,
-    url: String,
-    html_url: String,
+    pub url: String,
+    pub html_url: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -685,7 +685,7 @@ pub fn create_tree(owner: &str, repo: &str, head_sha: String) -> Result<String, 
     Ok(tree_sha)
 }
 
-pub fn get_parent(owner: &str, repo: &str, head_sha: String) -> Result<Vec<Parent>, ReqError> {
+pub fn get_parent_commit(owner: &str, repo: &str, head_sha: String) -> Result<Commit, ReqError> {
      let url: String = format!("https://api.github.com/repos/{}/{}/git/commits/{}", owner, repo, head_sha);
      let client = reqwest::blocking::Client::new();
      let response = client
@@ -697,7 +697,8 @@ pub fn get_parent(owner: &str, repo: &str, head_sha: String) -> Result<Vec<Paren
         .send()?;
     println!("get_commit HTTP code: {:?}", response.status());
     let data: Commit = response.json()?;
-    Ok(data.parents)
+    println!("data in get_parent: {:?}", data);
+    Ok(data)
 }
 
 // create the commit
@@ -709,6 +710,7 @@ pub fn push_commit(current_ref: String, owner: &str, repo: &str,  tree_sha: Stri
         let i = i; // elements are immutable pointers
         parent_sha.push(&i.sha);
     }
+    println!("parent_sha in push_commit : {:?}", parent_sha);
     let body = format!(
         r#"{{
             "message": "Update script",
